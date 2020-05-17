@@ -44,6 +44,11 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AutoUpdater", "AutoUpdater\
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SRS-Lua-Wrapper", "SRS-Lua-Wrapper\SRS-Lua-Wrapper.vcxproj", "{E1FF871E-F37A-4CB3-996C-91D9C6F6D7A4}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DCS-SRS-Tester", "DCS-SRS-Tester\DCS-SRS-Tester.csproj", "{D7446CBC-AFD9-408B-A58F-0EC29AB09A44}"
+	ProjectSection(ProjectDependencies) = postProject
+		{CFF33E05-1D37-4807-B1F7-5A1488D8EC4F} = {CFF33E05-1D37-4807-B1F7-5A1488D8EC4F}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -160,6 +165,18 @@ Global
 		{E1FF871E-F37A-4CB3-996C-91D9C6F6D7A4}.Release|x64.Build.0 = Release|x64
 		{E1FF871E-F37A-4CB3-996C-91D9C6F6D7A4}.Release|x86.ActiveCfg = Release|Win32
 		{E1FF871E-F37A-4CB3-996C-91D9C6F6D7A4}.Release|x86.Build.0 = Release|Win32
+		{D7446CBC-AFD9-408B-A58F-0EC29AB09A44}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D7446CBC-AFD9-408B-A58F-0EC29AB09A44}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D7446CBC-AFD9-408B-A58F-0EC29AB09A44}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{D7446CBC-AFD9-408B-A58F-0EC29AB09A44}.Debug|x64.Build.0 = Debug|Any CPU
+		{D7446CBC-AFD9-408B-A58F-0EC29AB09A44}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{D7446CBC-AFD9-408B-A58F-0EC29AB09A44}.Debug|x86.Build.0 = Debug|Any CPU
+		{D7446CBC-AFD9-408B-A58F-0EC29AB09A44}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D7446CBC-AFD9-408B-A58F-0EC29AB09A44}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D7446CBC-AFD9-408B-A58F-0EC29AB09A44}.Release|x64.ActiveCfg = Release|Any CPU
+		{D7446CBC-AFD9-408B-A58F-0EC29AB09A44}.Release|x64.Build.0 = Release|Any CPU
+		{D7446CBC-AFD9-408B-A58F-0EC29AB09A44}.Release|x86.ActiveCfg = Release|Any CPU
+		{D7446CBC-AFD9-408B-A58F-0EC29AB09A44}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

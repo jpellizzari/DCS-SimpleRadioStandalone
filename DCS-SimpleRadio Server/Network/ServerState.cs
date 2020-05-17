@@ -17,6 +17,7 @@ using Ciribob.DCS.SimpleRadio.Standalone.Common.Setting;
 using Ciribob.DCS.SimpleRadio.Standalone.Server.Settings;
 using Newtonsoft.Json;
 using NLog;
+using SuperSocket.SocketBase.Config;
 using LogManager = NLog.LogManager;
 
 namespace Ciribob.DCS.SimpleRadio.Standalone.Server.Network
@@ -292,6 +293,13 @@ namespace Ciribob.DCS.SimpleRadio.Standalone.Server.Network
                 listenerThread.Start();
 
                 _serverSync = new ServerSync(_connectedClients, _bannedIps, _eventAggregator);
+
+                //
+             //   base.Setup(new RootConfig(), new ServerConfig() { Port = _serverSettings.GetServerPort(), MaxRequestLength = 1024 * 1024, ClearIdleSession = false, TextEncoding = "UTF8", SyncSend = false });
+
+       
+                _serverSync.Setup(new RootConfig(), new ServerConfig() { Port = 5002, MaxRequestLength = 1024 * 1024, ClearIdleSession = false, TextEncoding = "UTF-8", SyncSend = false, MaxConnectionNumber=1000 });
+
                 var serverSyncThread = new Thread(_serverSync.StartListening);
                 serverSyncThread.Start();
             }
@@ -315,7 +323,7 @@ namespace Ciribob.DCS.SimpleRadio.Standalone.Server.Network
             {
                 try
                 {
-                    ((SRSClientSession)client.ClientSession).Disconnect();
+                    ((SRSClientSession)client.ClientSession).Close();
                 }
                 catch (Exception e)
                 {
@@ -328,7 +336,7 @@ namespace Ciribob.DCS.SimpleRadio.Standalone.Server.Network
         {
             try
             {
-                var remoteIpEndPoint = ((SRSClientSession)client.ClientSession).Socket.RemoteEndPoint as IPEndPoint;
+                var remoteIpEndPoint = ((SRSClientSession)client.ClientSession).RemoteEndPoint as IPEndPoint;
 
                 _bannedIps.Add(remoteIpEndPoint.Address);
 

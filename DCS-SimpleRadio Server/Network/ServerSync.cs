@@ -9,18 +9,21 @@ using Caliburn.Micro;
 using Ciribob.DCS.SimpleRadio.Standalone.Common;
 using Ciribob.DCS.SimpleRadio.Standalone.Common.Network;
 using Ciribob.DCS.SimpleRadio.Standalone.Common.Setting;
+using Ciribob.DCS.SimpleRadio.Standalone.Server.Network.SuperSocket;
 using Ciribob.DCS.SimpleRadio.Standalone.Server.Settings;
-using NetCoreServer;
 using Newtonsoft.Json;
 using NLog;
 using Open.Nat;
+using SuperSocket.SocketBase;
+using SuperSocket.SocketBase.Config;
+using SuperSocket.SocketBase.Protocol;
 using LogManager = NLog.LogManager;
 
 namespace Ciribob.DCS.SimpleRadio.Standalone.Server.Network
 {
-    public class ServerSync : TcpServer, IHandle<ServerSettingsChangedMessage>
+    public class ServerSync : AppServer<SRSClientSession, MyRequestInfo>, IHandle<ServerSettingsChangedMessage>
     {
-        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+        private new static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         private readonly HashSet<IPAddress> _bannedIps;
 
@@ -32,7 +35,7 @@ namespace Ciribob.DCS.SimpleRadio.Standalone.Server.Network
 
 
         public ServerSync(ConcurrentDictionary<string, SRClient> connectedClients, HashSet<IPAddress> _bannedIps,
-            IEventAggregator eventAggregator) : base(IPAddress.Any, ServerSettingsStore.Instance.GetServerPort())
+            IEventAggregator eventAggregator):base(new DefaultReceiveFilterFactory<MyReceiveFilter, MyRequestInfo>())
         {
             _clients = connectedClients;
             this._bannedIps = _bannedIps;
@@ -40,7 +43,6 @@ namespace Ciribob.DCS.SimpleRadio.Standalone.Server.Network
             _eventAggregator.Subscribe(this);
             _serverSettings = ServerSettingsStore.Instance;
 
-            OptionKeepAlive = true;
 
             if (_serverSettings.GetServerSetting(ServerSettingsKeys.UPNP_ENABLED).BoolValue)
             {
@@ -48,6 +50,60 @@ namespace Ciribob.DCS.SimpleRadio.Standalone.Server.Network
                 _natHandler.OpenNAT();
             }
             
+            
+        }
+
+
+        protected override void OnSessionClosed(SRSClientSession session, CloseReason reason)
+        {
+            //Handle Disconnect
+            base.OnSessionClosed(session, reason);
+
+            HandleDisconnect(session);
+        }
+
+        protected override void OnNewSessionConnected(SRSClientSession session)
+        {
+            //handle ip block
+            base.OnNewSessionConnected(session);
+
+            var clientIp = session.RemoteEndPoint;
+
+            if (_bannedIps.Contains(clientIp.Address))
+            {
+                Logger.Warn("Disconnecting Banned Client -  " + clientIp.Address + " " + clientIp.Port);
+
+                session.Close(CloseReason.ClientClosing);
+            }
+        }
+
+        protected override void ExecuteCommand(SRSClientSession session, MyRequestInfo requestInfo)
+        {
+            if(requestInfo!=null)
+            {
+                foreach (var message in requestInfo.Messages)
+                {
+                    try
+                    {
+                        HandleMessage(session, message);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Error(ex, $"Unable to process Message");
+                    }
+                }
+            }
+        }
+
+
+        protected override void OnStartup()
+        {
+            base.OnStartup();
+        }
+
+        protected override void OnStopped()
+        {
+            base.OnStopped();
         }
 
         public void Handle(ServerSettingsChangedMessage message)
@@ -62,17 +118,12 @@ namespace Ciribob.DCS.SimpleRadio.Standalone.Server.Network
             }
         }
 
-        protected override TcpSession CreateSession() { return new SRSClientSession(this, _clients, _bannedIps); }
-
-        protected override void OnError(SocketError error)
-        {
-            Logger.Error($"TCP SERVER ERROR: {error} ");
-        }
-
+      
         public void StartListening()
         {
-            OptionKeepAlive = true;
             Start();
+
+           
         }
 
         public void HandleDisconnect(SRSClientSession state)
@@ -167,12 +218,12 @@ namespace Ciribob.DCS.SimpleRadio.Standalone.Server.Network
             var srClient = message.Client;
             if (!_clients.ContainsKey(srClient.ClientGuid))
             {
-                var clientIp = (IPEndPoint)state.Socket.RemoteEndPoint;
+                var clientIp = state.RemoteEndPoint;
                 if (message.Version == null)
                 {
                     Logger.Warn("Disconnecting Unversioned Client -  " + clientIp.Address + " " +
                                 clientIp.Port);
-                    state.Disconnect();
+                    state.Close();
                     return false;
                 }
 
@@ -186,7 +237,7 @@ namespace Ciribob.DCS.SimpleRadio.Standalone.Server.Network
                     HandleVersionMismatch(state);
 
                     //close socket after
-                    state.Disconnect();
+                    state.Close();
 
                     return false;
                 }
@@ -214,7 +265,50 @@ namespace Ciribob.DCS.SimpleRadio.Standalone.Server.Network
                 ServerSettings = _serverSettings.ToDictionary()
             };
 
-            Multicast(replyMessage.Encode());
+
+            Multicast(replyMessage);
+
+        }
+
+        public void Multicast(NetworkMessage message)
+        {
+            var str = message.Encode();
+            foreach(var session in this.GetAllSessions())
+            {
+                try {
+                    if (session.Connected)
+                    {
+                        session.TrySend(str);
+                    }
+                }
+                catch(Exception ex)
+                {
+                    Logger.Error(ex, $"Error Sending to Client {session.SessionID}");
+                }
+                
+                
+            }
+        }
+
+        public void MulticastAllExeceptOne(NetworkMessage message, string id)
+        {
+            var str = message.Encode();
+            foreach (var session in this.GetAllSessions())
+            {
+                try
+                {
+                    if (session.Connected && !session.SessionID.Equals(id))
+                    {
+                        session.TrySend(str);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, $"Error Sending to Client {session.SessionID}");
+                }
+
+
+            }
 
         }
 
@@ -224,8 +318,9 @@ namespace Ciribob.DCS.SimpleRadio.Standalone.Server.Network
             var replyMessage = new NetworkMessage
             {
                 MsgType = NetworkMessage.MessageType.VERSION_MISMATCH,
+                ServerSettings = _serverSettings.ToDictionary()
             };
-            session.Send(replyMessage.Encode());
+            session.TrySend(replyMessage.Encode());
         }
 
         private void HandleClientMetaDataUpdate(SRSClientSession session, NetworkMessage message, bool send)
@@ -261,7 +356,7 @@ namespace Ciribob.DCS.SimpleRadio.Standalone.Server.Network
                     };
 
                     if (send)
-                        MulticastAllExeceptOne(replyMessage.Encode(),session.Id);
+                        MulticastAllExeceptOne(replyMessage,session.SessionID);
 
                     // Only redraw client admin UI of server if really needed
                     if (redrawClientAdminList)
@@ -281,10 +376,10 @@ namespace Ciribob.DCS.SimpleRadio.Standalone.Server.Network
                 MsgType = NetworkMessage.MessageType.CLIENT_DISCONNECT
             };
 
-            MulticastAllExeceptOne(message.Encode(), srsSession.Id);
+            MulticastAllExeceptOne(message, srsSession.SessionID);
             try
             {
-                srsSession.Dispose();
+                srsSession.Close();
             }
             catch (Exception) { }
           
@@ -349,7 +444,7 @@ namespace Ciribob.DCS.SimpleRadio.Standalone.Server.Network
                                     Seat = client.Seat
                                 }
                             };
-                            Multicast(replyMessage.Encode());
+                            Multicast(replyMessage);
                         }
                     }
                 }
@@ -367,7 +462,7 @@ namespace Ciribob.DCS.SimpleRadio.Standalone.Server.Network
                 Version = UpdaterChecker.VERSION
             };
 
-            session.Send(replyMessage.Encode());
+            session.TrySend(replyMessage.Encode());
 
             //send update to everyone
             //Remove Client Radio Info
@@ -380,7 +475,7 @@ namespace Ciribob.DCS.SimpleRadio.Standalone.Server.Network
                 }
             };
 
-            Multicast(update.Encode());
+            Multicast(update);
         }
 
         private void HandleExternalAWACSModePassword(SRSClientSession session, string password, SRClient client)
@@ -418,7 +513,7 @@ namespace Ciribob.DCS.SimpleRadio.Standalone.Server.Network
                 MsgType = NetworkMessage.MessageType.EXTERNAL_AWACS_MODE_PASSWORD,
             };
 
-            session.Send(replyMessage.Encode());
+            session.TrySend(replyMessage.Encode());
 
             var message = new NetworkMessage
             {
@@ -434,7 +529,7 @@ namespace Ciribob.DCS.SimpleRadio.Standalone.Server.Network
                 }
             };
 
-            Multicast(message.Encode());
+            Multicast(message);
         }
 
         private void HandleExternalAWACSModeDisconnect(SRSClientSession session, SRClient client)
@@ -462,7 +557,7 @@ namespace Ciribob.DCS.SimpleRadio.Standalone.Server.Network
                     }
                 };
 
-                MulticastAllExeceptOne(message.Encode(), session.Id);
+                MulticastAllExeceptOne(message, session.SessionID);
             }
         }
 
@@ -471,14 +566,14 @@ namespace Ciribob.DCS.SimpleRadio.Standalone.Server.Network
             try
             {
                 _natHandler?.CloseNAT();
+                _eventAggregator.Unsubscribe(this);
             }
             catch
             {
             }
 
             try
-            {
-                DisconnectAll();
+            {   
                 Stop();
                 _clients.Clear();
             }
