@@ -1302,61 +1302,64 @@ function SR.exportRadioA10C(_data)
         end
     end
 
+    local vhfRadioIndex = 3
+    local uhfRadioIndex = 2
+    local fmRadioIndex = 4
 
     -- VHF AM
     -- Set radio data
-    _data.radios[2].name = "AN/ARC-186(V) AM"
-    _data.radios[2].freq = SR.getRadioFrequency(55)
-    _data.radios[2].modulation = 0
-    _data.radios[2].volume = SR.getRadioVolume(0, 133, { 0.0, 1.0 }, false) * SR.getRadioVolume(0, 238, { 0.0, 1.0 }, false) * SR.getRadioVolume(0, 225, { 0.0, 1.0 }, false) * SR.getButtonPosition(226)
+    _data.radios[vhfRadioIndex].name = "AN/ARC-186(V) AM"
+    _data.radios[vhfRadioIndex].freq = SR.getRadioFrequency(55)
+    _data.radios[vhfRadioIndex].modulation = 0
+    _data.radios[vhfRadioIndex].volume = SR.getRadioVolume(0, 133, { 0.0, 1.0 }, false) * SR.getRadioVolume(0, 238, { 0.0, 1.0 }, false) * SR.getRadioVolume(0, 225, { 0.0, 1.0 }, false) * SR.getButtonPosition(226)
 
 
     -- UHF
     -- Set radio data
-    _data.radios[3].name = "AN/ARC-164 UHF"
-    _data.radios[3].freq = SR.getRadioFrequency(54)
+    _data.radios[uhfRadioIndex].name = "AN/ARC-164 UHF"
+    _data.radios[uhfRadioIndex].freq = SR.getRadioFrequency(54)
     
     local modulation = SR.getSelectorPosition(162, 0.1)
 
     --is HQ selected (A on the Radio)
     if modulation == 2 then
-        _data.radios[3].modulation = 4
+        _data.radios[uhfRadioIndex].modulation = 4
     else
-        _data.radios[3].modulation = 0
+        _data.radios[uhfRadioIndex].modulation = 0
     end
 
 
-    _data.radios[3].volume = SR.getRadioVolume(0, 171, { 0.0, 1.0 }, false) * SR.getRadioVolume(0, 238, { 0.0, 1.0 }, false) * SR.getRadioVolume(0, 227, { 0.0, 1.0 }, false) * SR.getButtonPosition(228)
-    _data.radios[3].encMode = 2 -- Mode 2 is set by aircraft
+    _data.radios[uhfRadioIndex].volume = SR.getRadioVolume(0, 171, { 0.0, 1.0 }, false) * SR.getRadioVolume(0, 238, { 0.0, 1.0 }, false) * SR.getRadioVolume(0, 227, { 0.0, 1.0 }, false) * SR.getButtonPosition(228)
+    _data.radios[uhfRadioIndex].encMode = 2 -- Mode 2 is set by aircraft
 
     -- Check UHF frequency mode (0 = MNL, 1 = PRESET, 2 = GRD)
     local _selector = SR.getSelectorPosition(167, 0.1)
     if _selector == 1 then
         -- Using UHF preset channels
         local _channel = SR.getSelectorPosition(161, 0.05) + 1 --add 1 as channel 0 is channel 1
-        _data.radios[3].channel = _channel
+        _data.radios[uhfRadioIndex].channel = _channel
     end
 
     -- Check UHF function mode (0 = OFF, 1 = MAIN, 2 = BOTH, 3 = ADF)
     local uhfModeKnob = SR.getSelectorPosition(168, 0.1)
-    if uhfModeKnob == 2 and _data.radios[3].freq > 1000 then
+    if uhfModeKnob == 2 and _data.radios[uhfRadioIndex].freq > 1000 then
         -- Function dial set to BOTH
         -- Listen to Guard as well as designated frequency
-        _data.radios[3].secFreq = 243.0 * 1000000
+        _data.radios[uhfRadioIndex].secFreq = 243.0 * 1000000
     else
         -- Function dial set to OFF, MAIN, or ADF
         -- Not listening to Guard secondarily
-        _data.radios[3].secFreq = 0
+        _data.radios[uhfRadioIndex].secFreq = 0
     end
 
 
     -- VHF FM
     -- Set radio data
-    _data.radios[4].name = "AN/ARC-186(V)FM"
-    _data.radios[4].freq = SR.getRadioFrequency(56)
-    _data.radios[4].modulation = 1
-    _data.radios[4].volume = SR.getRadioVolume(0, 147, { 0.0, 1.0 }, false) * SR.getRadioVolume(0, 238, { 0.0, 1.0 }, false) * SR.getRadioVolume(0, 223, { 0.0, 1.0 }, false) * SR.getButtonPosition(224)
-    _data.radios[4].encMode = 2 -- mode 2 enc is set by aircraft & turned on by aircraft
+    _data.radios[fmRadioIndex].name = "AN/ARC-186(V)FM"
+    _data.radios[fmRadioIndex].freq = SR.getRadioFrequency(56)
+    _data.radios[fmRadioIndex].modulation = 1
+    _data.radios[fmRadioIndex].volume = SR.getRadioVolume(0, 147, { 0.0, 1.0 }, false) * SR.getRadioVolume(0, 238, { 0.0, 1.0 }, false) * SR.getRadioVolume(0, 223, { 0.0, 1.0 }, false) * SR.getButtonPosition(224)
+    _data.radios[fmRadioIndex].encMode = 2 -- mode 2 enc is set by aircraft & turned on by aircraft
 
 
     -- KY-58 Radio Encryption
@@ -1369,10 +1372,10 @@ function SR.exportRadioA10C(_data)
         local _radio = nil
         if SR.round(SR.getButtonPosition(781), 0.1) == 0.2 then
             --crad/2 vhf - FM
-            _radio = _data.radios[4]
+            _radio = _data.radios[fmRadioIndex]
         elseif SR.getButtonPosition(781) == 0 then
             --crad/1 uhf
-            _radio = _data.radios[3]
+            _radio = _data.radios[uhfRadioIndex]
         end
 
         -- Get encryption key
